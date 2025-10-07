@@ -41,6 +41,7 @@ conversation_memory.json
 group_conversation_memory.json
 user_context.json
 group_messages.json
+user_preferences.json
 
 # IDE
 .vscode/

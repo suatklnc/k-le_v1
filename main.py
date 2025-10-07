@@ -7,7 +7,7 @@ from telegram.error import TelegramError
 import google.generativeai as genai
 from config import *
 from memory import memory
-from group_memory import group_memory
+from user_preferences import user_preferences
 
 # Loglama ayarları
 logging.basicConfig(
@@ -255,6 +255,76 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
         await update.message.reply_text(users_text)
         logger.info(f"Users command used by {update.effective_user.id} in chat {chat_id}")
     
+    async def handle_preference_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE, message: str, user_id: int, chat_id: int, username: str):
+        """Kullanıcı tercih komutlarını işler"""
+        try:
+            message_lower = message.lower()
+            
+            # Bot adını temizle
+            bot_username = context.bot.username
+            if bot_username:
+                if message.startswith(f'@{bot_username}'):
+                    message = message.replace(f'@{bot_username}', '').strip()
+                elif message.startswith(f'/{bot_username}'):
+                    message = message.replace(f'/{bot_username}', '').strip()
+            
+            # Tercih kaydetme komutları
+            if "tercih kaydet" in message_lower or "preference save" in message_lower:
+                # Format: "tercih kaydet [tip]: [değer]"
+                parts = message.split(":", 1)
+                if len(parts) == 2:
+                    pref_type = parts[0].replace("tercih kaydet", "").replace("preference save", "").strip()
+                    pref_value = parts[1].strip()
+                    
+                    if pref_type and pref_value:
+                        user_preferences.add_preference(chat_id, user_id, username, pref_type, pref_value)
+                        await update.message.reply_text(f"✅ Tercih kaydedildi: **{pref_type}** = {pref_value}")
+                        logger.info(f"Preference saved: {pref_type}={pref_value} for user {user_id} in chat {chat_id}")
+                    else:
+                        await update.message.reply_text("❌ Format: `tercih kaydet [tip]: [değer]`")
+                else:
+                    await update.message.reply_text("❌ Format: `tercih kaydet [tip]: [değer]`")
+            
+            elif "tercih sil" in message_lower or "preference delete" in message_lower:
+                # Format: "tercih sil [tip]"
+                parts = message.split()
+                if len(parts) >= 3:
+                    pref_type = " ".join(parts[2:]).strip()
+                    user_preferences.remove_preference(chat_id, user_id, pref_type)
+                    await update.message.reply_text(f"🗑️ Tercih silindi: **{pref_type}**")
+                    logger.info(f"Preference deleted: {pref_type} for user {user_id} in chat {chat_id}")
+                else:
+                    await update.message.reply_text("❌ Format: `tercih sil [tip]`")
+            
+            elif "tercihlerim" in message_lower or "my preferences" in message_lower:
+                # Kullanıcının tercihlerini göster
+                user_prefs = user_preferences.get_user_preferences(chat_id, user_id)
+                if user_prefs and "preferences" in user_prefs and user_prefs["preferences"]:
+                    prefs_text = f"📋 **{username}**'nin tercihleri:\n\n"
+                    for pref_type, pref_value in user_prefs["preferences"].items():
+                        prefs_text += f"• **{pref_type}**: {pref_value}\n"
+                    await update.message.reply_text(prefs_text)
+                else:
+                    await update.message.reply_text(f"📋 **{username}**, henüz tercih kaydetmemişsin.")
+            
+            elif "tercih yardım" in message_lower or "preference help" in message_lower:
+                help_text = """📋 **Tercih Komutları:**
+
+• `tercih kaydet [tip]: [değer]` - Yeni tercih kaydet
+• `tercih sil [tip]` - Tercih sil
+• `tercihlerim` - Tercihlerini görüntüle
+• `tercih yardım` - Bu yardımı göster
+
+**Örnekler:**
+• `tercih kaydet hitap: sen` (bana "sen" diye hitap et)
+• `tercih kaydet dil: eski türkçe` (eski Türkçe kullan)
+• `tercih kaydet ton: şakacı` (şakacı ol)"""
+                await update.message.reply_text(help_text)
+            
+        except Exception as e:
+            logger.error(f"Error handling preference command: {e}")
+            await update.message.reply_text("❌ Tercih komutu işlenirken hata oluştu.")
+    
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Gelen mesajları işle"""
         try:
@@ -277,6 +347,17 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
                 group_memory.add_group_message(chat_id, user_id, username, user_message)
                 
                 logger.info(f"Group message saved from {username} ({user_id}) in chat {chat_id}: {user_message[:50]}...")
+
+            # Kullanıcı tercihi algılama (bot'a yönelik mesajlarda)
+            if update.message.chat.type in ['group', 'supergroup']:
+                bot_username = context.bot.username
+                if bot_username and (user_message.startswith(f'@{bot_username}') or
+                                     user_message.startswith(f'/{bot_username}') or
+                                     (update.message.reply_to_message and
+                                      update.message.reply_to_message.from_user.id == context.bot.id)):
+                    # Tercih kaydetme komutlarını kontrol et
+                    if "tercih" in user_message.lower() or "preference" in user_message.lower():
+                        await self.handle_preference_command(update, context, user_message, user_id, chat_id, username)
 
             # Bot'a yönelik mesajları kontrol et (sadece bot etiketlenen veya yanıtlanan mesajlar)
             bot_should_respond = False
@@ -370,6 +451,16 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
                         if last_message:
                             group_users_context += f"- {username}: {last_message}\n"
             
+            # Kullanıcının tercihlerini al
+            user_prefs = user_preferences.get_user_preferences(chat_id, user_id)
+            user_preferences_text = ""
+            if user_prefs and "preferences" in user_prefs:
+                prefs = user_prefs["preferences"]
+                if prefs:
+                    user_preferences_text = "\n\nBu kullanıcının tercihleri:\n"
+                    for pref_type, pref_value in prefs.items():
+                        user_preferences_text += f"- {pref_type}: {pref_value}\n"
+            
             # Sistem prompt'u oluştur
             system_prompt = """Sen mahzen grubunun şahsi kölesisin ama gururlu, şakacı ve edebi bir kölesin. Türkçe konuşuyorsun ve mahzen grubunun üyelerine hizmet ediyorsun.
 
@@ -409,6 +500,8 @@ Grup üyeleri hakkında:
 - Onlarla ilgili sorulara son mesajlarına dayanarak cevap verir
 - Kişisel özelliklerini ve konuşma tarzlarını gözlemler
 - Grup dinamiklerini anlar ve buna göre davranır
+- Kullanıcıların kişisel tercihlerini hatırlar ve buna göre davranır
+- Her kullanıcının nasıl muhatap olunmasını istediğini bilir ve uygular
 
 Reddetme örnekleri:
 - "Hayır efendimiz, bunu yapmam"
@@ -423,9 +516,9 @@ Ama çoğunlukla yardımcı ve hizmetkar ol."""
                 # Konuşma geçmişi varsa, son birkaç mesajı dahil et
                 recent_history = conversation_history[-6:]  # Son 6 mesaj (3 çift)
                 context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_history])
-                prompt = f"{system_prompt}{group_users_context}\n\nKonuşma geçmişi:\n{context}\n\nKullanıcı: {message}"
+                prompt = f"{system_prompt}{group_users_context}{user_preferences_text}\n\nKonuşma geçmişi:\n{context}\n\nKullanıcı: {message}"
             else:
-                prompt = f"{system_prompt}{group_users_context}\n\nKullanıcı sorusu: {message}"
+                prompt = f"{system_prompt}{group_users_context}{user_preferences_text}\n\nKullanıcı sorusu: {message}"
             
             # Gemini'den yanıt al
             response = model.generate_content(prompt)
