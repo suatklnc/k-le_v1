@@ -1,0 +1,16 @@
+# .env dosyası - Bu dosyayı kopyalayın ve gerçek değerlerle doldurun
+
+# Telegram Bot Token (BotFather'dan alın)
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# Google Gemini API Key (Google AI Studio'dan alın)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Bot kullanıcı adı (opsiyonel)
+BOT_USERNAME=your_bot_username
+
+# İzin verilen grup ID'leri (boş bırakırsanız tüm gruplar kabul edilir)
+# ALLOWED_GROUPS=123456789,-987654321
+
+# Bot yöneticilerinin user ID'leri
+# ADMIN_USER_IDS=123456789,987654321
