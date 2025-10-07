@@ -45,6 +45,11 @@ class GroupMemory:
         with open(self.private_memory_file, 'w', encoding='utf-8') as f:
             json.dump(self.private_messages, f, ensure_ascii=False, indent=4)
 
+    def _save_group_memory(self):
+        """Grup mesajlarını dosyaya kaydeder."""
+        with open(self.group_memory_file, 'w', encoding='utf-8') as f:
+            json.dump(self.group_messages, f, ensure_ascii=False, indent=4)
+
     def add_private_message(self, user_id: int, username: str, message: str, message_type: str = "user"):
         """Özel mesajı kaydeder."""
         user_key = str(user_id)
