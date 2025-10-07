@@ -4,6 +4,9 @@ import time
 from typing import Dict, List, Any
 from datetime import datetime, timedelta
 
+# Grup hafıza ayarları
+MAX_GROUP_MESSAGES = 400  # Her grup için saklanacak maksimum mesaj sayısı
+
 class GroupMemory:
     def __init__(self):
         self.group_memory_file = "group_messages.json"
@@ -42,9 +45,9 @@ class GroupMemory:
             "datetime": datetime.now().isoformat()
         })
 
-        # Son 100 mesajı tut (çok fazla yer kaplamasın)
-        if len(self.group_messages[chat_key]) > 100:
-            self.group_messages[chat_key] = self.group_messages[chat_key][-100:]
+        # Maksimum mesaj sayısını kontrol et
+        if len(self.group_messages[chat_key]) > MAX_GROUP_MESSAGES:
+            self.group_messages[chat_key] = self.group_messages[chat_key][-MAX_GROUP_MESSAGES:]
 
         self._save_group_memory()
 
@@ -102,6 +105,7 @@ class GroupMemory:
         return {
             "total_groups": total_groups,
             "total_messages": total_messages,
+            "max_messages_per_group": MAX_GROUP_MESSAGES,
             "groups": list(self.group_messages.keys())
         }
 
