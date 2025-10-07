@@ -32,9 +32,9 @@ wheels/
 # .env.test.local
 # .env.production.local
 
-# Logs
-*.log
-bot.log
+# Logs - ARTIK IGNORE ETMİYORUZ
+# *.log
+# bot.log
 
 # Memory files
 conversation_memory.json
