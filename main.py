@@ -326,6 +326,94 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
             logger.error(f"Error handling preference command: {e}")
             await update.message.reply_text("❌ Tercih komutu işlenirken hata oluştu.")
     
+    async def auto_detect_preferences(self, update: Update, context: ContextTypes.DEFAULT_TYPE, message: str, user_id: int, chat_id: int, username: str):
+        """Kullanıcı mesajlarından otomatik tercih algılar"""
+        try:
+            message_lower = message.lower()
+            
+            # Bot adını temizle
+            bot_username = context.bot.username
+            if bot_username:
+                if message.startswith(f'@{bot_username}'):
+                    message = message.replace(f'@{bot_username}', '').strip()
+                elif message.startswith(f'/{bot_username}'):
+                    message = message.replace(f'/{bot_username}', '').strip()
+            
+            message_lower = message.lower()
+            detected_preferences = []
+            
+            # Hitap tercihleri
+            if any(word in message_lower for word in ['bana', 'sen', 'siz', 'hitap', 'çağır', 'seslen']):
+                if 'sen' in message_lower and ('de' in message_lower or 'diye' in message_lower or 'şekilde' in message_lower):
+                    detected_preferences.append(('hitap', 'sen'))
+                elif 'siz' in message_lower and ('de' in message_lower or 'diye' in message_lower or 'şekilde' in message_lower):
+                    detected_preferences.append(('hitap', 'siz'))
+                elif 'efendim' in message_lower:
+                    detected_preferences.append(('hitap', 'efendim'))
+                elif 'kanka' in message_lower or 'dost' in message_lower:
+                    detected_preferences.append(('hitap', 'kanka'))
+            
+            # Dil tercihleri
+            if any(word in message_lower for word in ['eski türkçe', 'osmanlıca', 'arapça', 'farsça']):
+                if 'eski türkçe' in message_lower or 'osmanlıca' in message_lower:
+                    detected_preferences.append(('dil', 'eski türkçe'))
+                elif 'arapça' in message_lower:
+                    detected_preferences.append(('dil', 'arapça'))
+                elif 'farsça' in message_lower:
+                    detected_preferences.append(('dil', 'farsça'))
+            elif 'modern' in message_lower and 'türkçe' in message_lower:
+                detected_preferences.append(('dil', 'modern türkçe'))
+            
+            # Ton tercihleri
+            if any(word in message_lower for word in ['şakacı', 'esprili', 'komik', 'eğlenceli']):
+                detected_preferences.append(('ton', 'şakacı'))
+            elif any(word in message_lower for word in ['ciddi', 'resmi', 'formal']):
+                detected_preferences.append(('ton', 'ciddi'))
+            elif any(word in message_lower for word in ['romantik', 'aşık', 'şiirsel']):
+                detected_preferences.append(('ton', 'romantik'))
+            
+            # Şair tercihleri
+            poets = ['nazım hikmet', 'yahya kemal', 'orhan veli', 'cemal süreya', 'attila ilhan', 'turgut uyar', 'edip cansever', 'shelley', 'keats', 'byron']
+            for poet in poets:
+                if poet in message_lower and any(word in message_lower for word in ['seviyorum', 'beğeniyorum', 'okuyor', 'şiir']):
+                    detected_preferences.append(('şair', poet))
+            
+            # Kişilik tercihleri
+            if any(word in message_lower for word in ['gururlu', 'dik başlı', 'kendine güvenen']):
+                detected_preferences.append(('kişilik', 'gururlu'))
+            elif any(word in message_lower for word in ['itaatkar', 'saygılı', 'hizmetkar']):
+                detected_preferences.append(('kişilik', 'itaatkar'))
+            elif any(word in message_lower for word in ['şakacı', 'esprili', 'komik']):
+                detected_preferences.append(('kişilik', 'şakacı'))
+            
+            # Özel tercihler
+            if 'ben' in message_lower and any(word in message_lower for word in ['seviyorum', 'beğeniyorum', 'hoşlanıyorum']):
+                # Genel sevme ifadelerini yakala
+                if 'şiir' in message_lower:
+                    detected_preferences.append(('ilgi', 'şiir'))
+                elif 'müzik' in message_lower:
+                    detected_preferences.append(('ilgi', 'müzik'))
+                elif 'kitap' in message_lower:
+                    detected_preferences.append(('ilgi', 'kitap'))
+                elif 'sanat' in message_lower:
+                    detected_preferences.append(('ilgi', 'sanat'))
+            
+            # Tercihleri kaydet
+            if detected_preferences:
+                for pref_type, pref_value in detected_preferences:
+                    user_preferences.add_preference(chat_id, user_id, username, pref_type, pref_value)
+                
+                # Kullanıcıya bildirim gönder
+                prefs_text = "🧠 **Otomatik tercih algılandı:**\n"
+                for pref_type, pref_value in detected_preferences:
+                    prefs_text += f"• **{pref_type}**: {pref_value}\n"
+                
+                await update.message.reply_text(prefs_text)
+                logger.info(f"Auto-detected preferences for {username}: {detected_preferences}")
+            
+        except Exception as e:
+            logger.error(f"Error in auto preference detection: {e}")
+    
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Gelen mesajları işle"""
         try:
@@ -359,6 +447,9 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
                     # Tercih kaydetme komutlarını kontrol et
                     if "tercih" in user_message.lower() or "preference" in user_message.lower():
                         await self.handle_preference_command(update, context, user_message, user_id, chat_id, username)
+                    
+                    # Otomatik tercih algılama
+                    await self.auto_detect_preferences(update, context, user_message, user_id, chat_id, username)
 
             # Bot'a yönelik mesajları kontrol et (sadece bot etiketlenen veya yanıtlanan mesajlar)
             bot_should_respond = False
