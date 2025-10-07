@@ -7,6 +7,7 @@ from telegram.error import TelegramError
 import google.generativeai as genai
 from config import *
 from memory import memory
+from group_memory import group_memory
 from user_preferences import user_preferences
 
 # Loglama ayarları
