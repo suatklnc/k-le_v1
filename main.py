@@ -156,14 +156,19 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
         """
         await update.message.reply_text(info_text)
     
-    async def summary_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Grup mesajlarını özetleme komutu"""
-        chat_id = update.message.chat.id
-        
-        # Sadece gruplarda çalışır
-        if update.message.chat.type not in ['group', 'supergroup']:
-            await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
-            return
+        async def summary_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Grup mesajlarını özetleme komutu"""
+            chat_id = update.message.chat.id
+
+            # Sadece gruplarda çalışır
+            if update.message.chat.type not in ['group', 'supergroup']:
+                await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
+                return
+
+            # Güvenlik kontrolü
+            if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
+                logger.warning(f"Unauthorized summary command attempt: {chat_id} by user {update.effective_user.id}")
+                return
         
         # Son 24 saatlik özet
         recent_messages = group_memory.get_recent_messages(chat_id, 24)
@@ -175,27 +180,37 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
             await update.message.reply_text("Son 24 saatte hiç mesaj bulunamadı.")
         logger.info(f"Summary requested by {update.effective_user.id} in chat {chat_id}")
 
-    async def clear_group_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Grup mesajlarını temizleme komutu"""
-        chat_id = update.message.chat.id
-        
-        # Sadece gruplarda çalışır
-        if update.message.chat.type not in ['group', 'supergroup']:
-            await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
-            return
+        async def clear_group_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Grup mesajlarını temizleme komutu"""
+            chat_id = update.message.chat.id
+
+            # Sadece gruplarda çalışır
+            if update.message.chat.type not in ['group', 'supergroup']:
+                await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
+                return
+
+            # Güvenlik kontrolü
+            if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
+                logger.warning(f"Unauthorized clear command attempt: {chat_id} by user {update.effective_user.id}")
+                return
         
         group_memory.clear_group_messages(chat_id)
         await update.message.reply_text("🧹 Grup mesajları temizlendi!")
         logger.info(f"Group messages cleared by {update.effective_user.id} in chat {chat_id}")
 
-    async def users_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Grup üyelerinin durumunu gösteren komut"""
-        chat_id = update.message.chat.id
-        
-        # Sadece gruplarda çalışır
-        if update.message.chat.type not in ['group', 'supergroup']:
-            await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
-            return
+        async def users_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Grup üyelerinin durumunu gösteren komut"""
+            chat_id = update.message.chat.id
+
+            # Sadece gruplarda çalışır
+            if update.message.chat.type not in ['group', 'supergroup']:
+                await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
+                return
+
+            # Güvenlik kontrolü
+            if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
+                logger.warning(f"Unauthorized users command attempt: {chat_id} by user {update.effective_user.id}")
+                return
         
         users_summary = user_context.get_chat_users_summary(chat_id)
         
@@ -229,11 +244,14 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
             user_id = update.message.from_user.id
             chat_id = update.message.chat.id
 
+            # Güvenlik kontrolü: Sadece izin verilen gruplarda çalış
+            if update.message.chat.type in ['group', 'supergroup']:
+                if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
+                    logger.warning(f"Unauthorized group access attempt: {chat_id} by user {user_id}")
+                    return
+
             # Grup mesajlarını her zaman kaydet (bot etiketlenmese de)
             if update.message.chat.type in ['group', 'supergroup']:
-                if ALLOWED_GROUPS and update.message.chat.id not in ALLOWED_GROUPS:
-                    return
-                
                 username = update.message.from_user.username or update.message.from_user.first_name
                 group_memory.add_group_message(chat_id, user_id, username, user_message)
                 # Kullanıcı bağlamını da kaydet

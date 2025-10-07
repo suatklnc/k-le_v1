@@ -16,7 +16,7 @@ MAX_MESSAGE_LENGTH = 4000
 AI_MODEL = "models/gemini-2.0-flash"
 
 # Grup ayarları
-ALLOWED_GROUPS = []  # Boş liste tüm grupları kabul eder
+ALLOWED_GROUPS = [-1002792186251]  # Sadece mahzen grubu
 ADMIN_USER_IDS = []  # Bot yöneticilerinin user ID'leri
 
 # Hafıza ayarları
