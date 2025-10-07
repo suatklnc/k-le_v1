@@ -20,10 +20,10 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
-venv/
-env/
-ENV/
+# Virtual Environment - ARTIK IGNORE ETMİYORUZ
+# venv/
+# env/
+# ENV/
 
 # Environment variables
 .env
