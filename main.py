@@ -8,7 +8,6 @@ import google.generativeai as genai
 from config import *
 from memory import memory
 from group_memory import group_memory
-from user_context import user_context
 
 # Loglama ayarları
 logging.basicConfig(
@@ -155,21 +154,21 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
 • Mesaj gönderme izni verin
         """
         await update.message.reply_text(info_text)
-    
-        async def summary_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Grup mesajlarını özetleme komutu"""
-            chat_id = update.message.chat.id
 
-            # Sadece gruplarda çalışır
-            if update.message.chat.type not in ['group', 'supergroup']:
-                await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
-                return
+    async def summary_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Grup mesajlarını özetleme komutu"""
+        chat_id = update.message.chat.id
 
-            # Güvenlik kontrolü
-            if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
-                logger.warning(f"Unauthorized summary command attempt: {chat_id} by user {update.effective_user.id}")
-                return
-        
+        # Sadece gruplarda çalışır
+        if update.message.chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
+            return
+
+        # Güvenlik kontrolü
+        if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
+            logger.warning(f"Unauthorized summary command attempt: {chat_id} by user {update.effective_user.id}")
+            return
+
         # Son 24 saatlik özet
         recent_messages = group_memory.get_recent_messages(chat_id, 24)
         if recent_messages:
@@ -180,49 +179,71 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
             await update.message.reply_text("Son 24 saatte hiç mesaj bulunamadı.")
         logger.info(f"Summary requested by {update.effective_user.id} in chat {chat_id}")
 
-        async def clear_group_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Grup mesajlarını temizleme komutu"""
-            chat_id = update.message.chat.id
+    async def clear_group_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Grup mesajlarını temizleme komutu"""
+        chat_id = update.message.chat.id
 
-            # Sadece gruplarda çalışır
-            if update.message.chat.type not in ['group', 'supergroup']:
-                await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
-                return
+        # Sadece gruplarda çalışır
+        if update.message.chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
+            return
 
-            # Güvenlik kontrolü
-            if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
-                logger.warning(f"Unauthorized clear command attempt: {chat_id} by user {update.effective_user.id}")
-                return
-        
+        # Güvenlik kontrolü
+        if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
+            logger.warning(f"Unauthorized clear command attempt: {chat_id} by user {update.effective_user.id}")
+            return
+
         group_memory.clear_group_messages(chat_id)
         await update.message.reply_text("🧹 Grup mesajları temizlendi!")
         logger.info(f"Group messages cleared by {update.effective_user.id} in chat {chat_id}")
 
-        async def users_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Grup üyelerinin durumunu gösteren komut"""
-            chat_id = update.message.chat.id
+    async def users_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Grup üyelerinin durumunu gösteren komut"""
+        chat_id = update.message.chat.id
 
-            # Sadece gruplarda çalışır
-            if update.message.chat.type not in ['group', 'supergroup']:
-                await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
-                return
+        # Sadece gruplarda çalışır
+        if update.message.chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text("Bu komut sadece gruplarda çalışır!")
+            return
 
-            # Güvenlik kontrolü
-            if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
-                logger.warning(f"Unauthorized users command attempt: {chat_id} by user {update.effective_user.id}")
-                return
+        # Güvenlik kontrolü
+        if ALLOWED_GROUPS and chat_id not in ALLOWED_GROUPS:
+            logger.warning(f"Unauthorized users command attempt: {chat_id} by user {update.effective_user.id}")
+            return
+
+        # Son 24 saatlik mesajlardan kullanıcı özetini oluştur
+        recent_messages = group_memory.get_recent_messages(chat_id, 24)
         
-        users_summary = user_context.get_chat_users_summary(chat_id)
-        
-        if not users_summary:
+        if not recent_messages:
             await update.message.reply_text("Henüz grup üyelerinin mesajları kaydedilmemiş.")
             return
         
+        # Kullanıcıları grupla ve istatistiklerini hesapla
+        user_stats = {}
+        for msg in recent_messages:
+            user_id = msg['user_id']
+            username = msg['username']
+            
+            if user_id not in user_stats:
+                user_stats[user_id] = {
+                    'username': username,
+                    'message_count': 0,
+                    'last_message': '',
+                    'last_timestamp': 0
+                }
+            
+            user_stats[user_id]['message_count'] += 1
+            
+            # En son mesajı güncelle
+            if msg['timestamp'] > user_stats[user_id]['last_timestamp']:
+                user_stats[user_id]['last_message'] = msg['message']
+                user_stats[user_id]['last_timestamp'] = msg['timestamp']
+        
         # En aktif 10 kullanıcıyı göster
-        active_users = users_summary[:10]
+        sorted_users = sorted(user_stats.values(), key=lambda x: x['last_timestamp'], reverse=True)[:10]
         
         users_text = "👥 Grup Üyelerinin Durumu:\n\n"
-        for i, user_info in enumerate(active_users, 1):
+        for i, user_info in enumerate(sorted_users, 1):
             username = user_info["username"]
             message_count = user_info["message_count"]
             last_message = user_info["last_message"][:50] + "..." if len(user_info["last_message"]) > 50 else user_info["last_message"]
@@ -254,8 +275,6 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
             if update.message.chat.type in ['group', 'supergroup']:
                 username = update.message.from_user.username or update.message.from_user.first_name
                 group_memory.add_group_message(chat_id, user_id, username, user_message)
-                # Kullanıcı bağlamını da kaydet
-                user_context.add_user_message(chat_id, user_id, username, user_message)
                 
                 logger.info(f"Group message saved from {username} ({user_id}) in chat {chat_id}: {user_message[:50]}...")
 
@@ -327,10 +346,25 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
             # Grup üyelerinin son mesajlarını al (eğer grup ise)
             group_users_context = ""
             if chat_id < 0:  # Grup chat'i
-                users_summary = user_context.get_chat_users_summary(chat_id)
-                if users_summary:
+                recent_messages = group_memory.get_recent_messages(chat_id, 24)
+                if recent_messages:
+                    # Kullanıcıları grupla ve son mesajlarını al
+                    user_last_messages = {}
+                    for msg in recent_messages:
+                        user_id_msg = msg['user_id']
+                        username = msg['username']
+                        if user_id_msg not in user_last_messages:
+                            user_last_messages[user_id_msg] = {
+                                'username': username,
+                                'last_message': msg['message'],
+                                'timestamp': msg['timestamp']
+                            }
+                        elif msg['timestamp'] > user_last_messages[user_id_msg]['timestamp']:
+                            user_last_messages[user_id_msg]['last_message'] = msg['message']
+                            user_last_messages[user_id_msg]['timestamp'] = msg['timestamp']
+                    
                     group_users_context = "\n\nGrup üyelerinin son mesajları:\n"
-                    for user_info in users_summary[:10]:  # En fazla 10 kullanıcı
+                    for user_info in list(user_last_messages.values())[:10]:  # En fazla 10 kullanıcı
                         username = user_info["username"]
                         last_message = user_info["last_message"]
                         if last_message:
