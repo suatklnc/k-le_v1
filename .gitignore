@@ -1,6 +1,6 @@
-# Python
-__pycache__/
-*.py[cod]
+# Python - ARTIK IGNORE ETMİYORUZ
+# __pycache__/
+# *.py[cod]
 *$py.class
 *.so
 .Python
