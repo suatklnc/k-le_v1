@@ -5,7 +5,7 @@ from typing import Dict, List, Any
 from datetime import datetime, timedelta
 
 # Grup hafıza ayarları
-MAX_GROUP_MESSAGES = 400  # Her grup için saklanacak maksimum mesaj sayısı
+MAX_GROUP_MESSAGES = 50  # Her grup için saklanacak maksimum mesaj sayısı
 
 class GroupMemory:
     def __init__(self):
