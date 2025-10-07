@@ -6,7 +6,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.error import TelegramError
 import google.generativeai as genai
 from config import *
-from memory import memory
 from group_memory import group_memory
 from user_preferences import user_preferences
 
@@ -69,24 +68,62 @@ Sadece bana bir mesaj gönderin, size hizmet etmeye çalışacağım!
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Yardım komutu"""
         help_text = """
-📚 Komutlar:
-/start - Botu başlat
-/help - Bu yardım mesajını göster
-/status - Bot durumunu kontrol et
+🤖 **MAHZEN GRUBU ŞAHSİ KÖLESİ - YARDIM**
+
+📚 **TEMEL KOMUTLAR:**
+/start - Botu başlat ve hoş geldin mesajı
+/help - Bu yardım menüsünü göster
+/status - Bot durumunu ve kimliğini kontrol et
 /memory - Hafıza durumunu göster
 /clear - Konuşma geçmişini temizle
+
+📊 **GRUP KOMUTLARI:**
 /groupinfo - Grup bilgilerini göster
-/ozet - Son konuşmaları özetle
+/ozet - Son 24 saatlik konuşmaları özetle
 /temizle - Grup mesajlarını temizle
 /uyeler - Grup üyelerinin durumunu göster
 
-💬 Kullanım:
-Herhangi bir soru sorabilirsiniz. Yapay zeka ile size en iyi cevabı vermeye çalışacağım.
+🔐 **TERCİH YÖNETİMİ (Kişisel Otonomi):**
+`tercih onayla` - Tercih kaydetme onayını ver
+`tercih kaydet [tip]: [değer]` - Yeni tercih kaydet
+`tercih durumum` - Tercih durumunu görüntüle
+`tercihlerim` - Kayıtlı tercihlerini görüntüle
+`tercih sil [tip]` - Belirli tercihi sil
+`tercih onayı geri al` - Onayı geri al ve tercihleri sil
+`tercih yardım` - Detaylı tercih yardımı
 
-🧠 Hafıza:
-Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
+🎯 **GÜVENLİ TERCIH TÜRLERİ:**
+• **hitap**: sen, siz, efendim, kanka, dost
+• **dil**: eski türkçe, modern türkçe, arapça, farsça
+• **ton**: şakacı, ciddi, romantik, nazik
+• **kişilik**: gururlu, itaatkar, şakacı, saygılı
+• **ilgi**: şiir, müzik, kitap, sanat, edebiyat
+• **şair**: nazım hikmet, yahya kemal, orhan veli, vb.
 
-⚠️ Not: Grup sohbetlerinde de çalışırım!
+🛡️ **GÜVENLİK VE GİZLİLİK:**
+✅ **Kişisel Otonomi**: Herkes sadece kendi tercihlerini belirleyebilir
+✅ **Başkası Adına Karar Verme Engelleme**: Hiç kimse başkasının adına tercih kaydedemez
+✅ **Açık Onay Sistemi**: Tercih kaydetmek için kullanıcı onayı gerekli
+✅ **Kimlik Doğrulama**: Her işlem sadece tercih sahibi tarafından yapılabilir
+✅ **Gizlilik**: Sadece onay veren kullanıcıların tercihleri kaydedilir
+
+💬 **KULLANIM:**
+• Herhangi bir soru sorabilirsiniz
+• Grup sohbetlerinde @bot_username ile etiketleyin
+• Bot'a yanıt vererek mesaj gönderin
+• Yapay zeka ile en iyi cevabı almaya çalışırım
+
+🧠 **HAFIZA SİSTEMİ:**
+• Konuşma geçmişinizi hatırlar
+• Grup üyelerinin son mesajlarını takip eder
+• Kişisel tercihlerinizi uygular
+• Daha iyi ve kişiselleştirilmiş yanıtlar verir
+
+⚠️ **ÖNEMLİ NOTLAR:**
+• Gururlu, şakacı ve edebi bir köleyim
+• Bazen eski Türkçe konuşur, bazen şiirle cevap veririm
+• Her kullanıcının kimlik haklarına saygı gösteririm
+• Sadece mahzen grubunda aktifim
         """
         await update.message.reply_text(help_text)
     
@@ -105,22 +142,33 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
     
     async def memory_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Hafıza durumu komutu"""
-        stats = memory.get_memory_stats()
+        stats = group_memory.get_group_stats()
         user_id = update.effective_user.id
         chat_id = update.message.chat.id
-        user_conversation = memory.get_conversation_history(user_id, chat_id)
+        
+        # Grup ve özel mesaj konuşmalarını al
+        if chat_id < 0:  # Grup mesajı
+            user_conversation = group_memory.get_conversation_history(chat_id, user_id)
+            private_conversation = group_memory.get_private_conversation_history(user_id)
+            conversation_type = "Grup"
+        else:  # Özel mesaj
+            user_conversation = group_memory.get_private_conversation_history(user_id)
+            private_conversation = []
+            conversation_type = "Özel"
         
         memory_text = f"""
 🧠 Hafıza Durumu:
-📊 Toplam konuşma: {stats['total_conversations']}
-💬 Toplam mesaj: {stats['total_messages']}
-🔧 Hafıza aktif: {'Evet' if stats['memory_enabled'] else 'Hayır'}
-📝 Maksimum mesaj: {stats['max_messages_per_conversation']}
+📊 Toplam grup: {stats['total_groups']}
+💬 Toplam grup mesajı: {stats['total_messages']}
+📝 Maksimum mesaj/grup: {stats['max_messages_per_group']}
 
-👤 Sizin konuşmanız:
+👤 Sizin {conversation_type.lower()} konuşmanız:
 📨 Mesaj sayısı: {len(user_conversation)}
 🆔 User ID: {user_id}
 💬 Chat ID: {chat_id}
+
+🔒 Özel mesajlarınız:
+📨 Mesaj sayısı: {len(private_conversation)}
         """
         await update.message.reply_text(memory_text)
     
@@ -129,8 +177,15 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
         user_id = update.effective_user.id
         chat_id = update.message.chat.id
         
-        memory.clear_conversation(user_id, chat_id)
-        await update.message.reply_text("🧹 Konuşma geçmişiniz temizlendi!")
+        # Grup ve özel mesajları temizle
+        if chat_id < 0:  # Grup mesajı
+            group_memory.clear_user_messages(chat_id, user_id)
+            group_memory.clear_private_messages(user_id)
+            await update.message.reply_text("🧹 Grup ve özel mesaj geçmişiniz temizlendi!")
+        else:  # Özel mesaj
+            group_memory.clear_private_messages(user_id)
+            await update.message.reply_text("🧹 Özel mesaj geçmişiniz temizlendi!")
+        
         logger.info(f"Memory cleared for user {user_id} in chat {chat_id}")
     
     async def group_info_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -278,9 +333,19 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
                     pref_value = parts[1].strip()
                     
                     if pref_type and pref_value:
-                        user_preferences.add_preference(chat_id, user_id, username, pref_type, pref_value)
-                        await update.message.reply_text(f"✅ Tercih kaydedildi: **{pref_type}** = {pref_value}")
-                        logger.info(f"Preference saved: {pref_type}={pref_value} for user {user_id} in chat {chat_id}")
+                        # Tercih değerini doğrula
+                        is_valid, validation_msg = user_preferences.validate_preference(pref_type, pref_value)
+                        if not is_valid:
+                            await update.message.reply_text(f"❌ {validation_msg}")
+                            return
+                        
+                        # Tercihi kaydet (onay kontrolü ile)
+                        success, result_msg = user_preferences.add_preference(chat_id, user_id, username, pref_type, pref_value, requesting_user_id=user_id)
+                        if success:
+                            await update.message.reply_text(f"✅ Tercih kaydedildi: **{pref_type}** = {pref_value}")
+                            logger.info(f"Preference saved: {pref_type}={pref_value} for user {user_id} in chat {chat_id}")
+                        else:
+                            await update.message.reply_text(f"⚠️ {result_msg}")
                     else:
                         await update.message.reply_text("❌ Format: `tercih kaydet [tip]: [değer]`")
                 else:
@@ -308,18 +373,66 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
                 else:
                     await update.message.reply_text(f"📋 **{username}**, henüz tercih kaydetmemişsin.")
             
+            elif "tercih onayla" in message_lower or "preference consent" in message_lower:
+                # Kullanıcının tercih kaydetme onayını ver
+                success, result_msg = user_preferences.give_consent(chat_id, user_id, username, requesting_user_id=user_id)
+                if success:
+                    await update.message.reply_text("✅ Tercih kaydetme onayınız verildi! Artık tercihlerinizi kaydedebilirim.")
+                    logger.info(f"Consent given by user {user_id} in chat {chat_id}")
+                else:
+                    await update.message.reply_text(f"❌ {result_msg}")
+            
+            elif "tercih onayı geri al" in message_lower or "revoke consent" in message_lower:
+                # Kullanıcının tercih kaydetme onayını geri al
+                success, result_msg = user_preferences.revoke_consent(chat_id, user_id, requesting_user_id=user_id)
+                if success:
+                    await update.message.reply_text("🗑️ Tercih kaydetme onayınız geri alındı ve tüm tercihleriniz silindi.")
+                    logger.info(f"Consent revoked by user {user_id} in chat {chat_id}")
+                else:
+                    await update.message.reply_text(f"❌ {result_msg}")
+            
+            elif "tercih durumum" in message_lower or "preference status" in message_lower:
+                # Kullanıcının tercih durumunu göster
+                has_consent = user_preferences.has_consent(chat_id, user_id)
+                user_prefs = user_preferences.get_user_preferences(chat_id, user_id)
+                
+                status_text = f"📋 **{username}**'nin tercih durumu:\n\n"
+                status_text += f"🔐 Onay durumu: {'✅ Verildi' if has_consent else '❌ Verilmedi'}\n"
+                
+                if user_prefs and "preferences" in user_prefs and user_prefs["preferences"]:
+                    status_text += f"\n📝 Kayıtlı tercihler:\n"
+                    for pref_type, pref_value in user_prefs["preferences"].items():
+                        status_text += f"• **{pref_type}**: {pref_value}\n"
+                else:
+                    status_text += "\n📝 Henüz kayıtlı tercih yok."
+                
+                await update.message.reply_text(status_text)
+            
             elif "tercih yardım" in message_lower or "preference help" in message_lower:
                 help_text = """📋 **Tercih Komutları:**
 
+• `tercih onayla` - Tercih kaydetme onayını ver
+• `tercih onayı geri al` - Onayı geri al ve tercihleri sil
+• `tercih durumum` - Tercih durumunu görüntüle
 • `tercih kaydet [tip]: [değer]` - Yeni tercih kaydet
 • `tercih sil [tip]` - Tercih sil
 • `tercihlerim` - Tercihlerini görüntüle
 • `tercih yardım` - Bu yardımı göster
 
+**Güvenli Tercih Türleri:**
+• **hitap**: sen, siz, efendim, kanka, dost
+• **dil**: eski türkçe, modern türkçe, arapça, farsça
+• **ton**: şakacı, ciddi, romantik, nazik
+• **kişilik**: gururlu, itaatkar, şakacı, saygılı
+• **ilgi**: şiir, müzik, kitap, sanat, edebiyat
+• **şair**: nazım hikmet, yahya kemal, orhan veli, cemal süreya, attila ilhan
+
 **Örnekler:**
 • `tercih kaydet hitap: sen` (bana "sen" diye hitap et)
 • `tercih kaydet dil: eski türkçe` (eski Türkçe kullan)
-• `tercih kaydet ton: şakacı` (şakacı ol)"""
+• `tercih kaydet ton: şakacı` (şakacı ol)
+
+**Gizlilik:** Tercihlerinizi kaydetmek için önce `tercih onayla` komutunu kullanın."""
                 await update.message.reply_text(help_text)
             
         except Exception as e:
@@ -398,18 +511,38 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
                 elif 'sanat' in message_lower:
                     detected_preferences.append(('ilgi', 'sanat'))
             
-            # Tercihleri kaydet
+            # Tercihleri kaydet (onay kontrolü ile)
             if detected_preferences:
+                saved_preferences = []
+                failed_preferences = []
+                
                 for pref_type, pref_value in detected_preferences:
-                    user_preferences.add_preference(chat_id, user_id, username, pref_type, pref_value)
+                    # Tercih değerini doğrula
+                    is_valid, validation_msg = user_preferences.validate_preference(pref_type, pref_value)
+                    if not is_valid:
+                        failed_preferences.append(f"{pref_type}: {validation_msg}")
+                        continue
+                    
+                    # Tercihi kaydet (onay kontrolü ile)
+                    success, result_msg = user_preferences.add_preference(chat_id, user_id, username, pref_type, pref_value, requesting_user_id=user_id)
+                    if success:
+                        saved_preferences.append(f"**{pref_type}**: {pref_value}")
+                    else:
+                        failed_preferences.append(f"{pref_type}: {result_msg}")
                 
                 # Kullanıcıya bildirim gönder
-                prefs_text = "🧠 **Otomatik tercih algılandı:**\n"
-                for pref_type, pref_value in detected_preferences:
-                    prefs_text += f"• **{pref_type}**: {pref_value}\n"
+                if saved_preferences:
+                    prefs_text = "🧠 **Otomatik tercih algılandı ve kaydedildi:**\n"
+                    for pref in saved_preferences:
+                        prefs_text += f"• {pref}\n"
+                    await update.message.reply_text(prefs_text)
+                    logger.info(f"Auto-detected and saved preferences for {username}: {saved_preferences}")
                 
-                await update.message.reply_text(prefs_text)
-                logger.info(f"Auto-detected preferences for {username}: {detected_preferences}")
+                if failed_preferences:
+                    failed_text = "⚠️ **Bazı tercihler kaydedilemedi:**\n"
+                    for failed in failed_preferences:
+                        failed_text += f"• {failed}\n"
+                    await update.message.reply_text(failed_text)
             
         except Exception as e:
             logger.error(f"Error in auto preference detection: {e}")
@@ -430,12 +563,18 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
                     logger.warning(f"Unauthorized group access attempt: {chat_id} by user {user_id}")
                     return
 
-            # Grup mesajlarını her zaman kaydet (bot etiketlenmese de)
+            # Kullanıcı adını al
+            username = update.message.from_user.username or update.message.from_user.first_name
+            
+            # Mesajları kaydet (grup ve özel mesajlar ayrı)
             if update.message.chat.type in ['group', 'supergroup']:
-                username = update.message.from_user.username or update.message.from_user.first_name
-                group_memory.add_group_message(chat_id, user_id, username, user_message)
-                
+                # Grup mesajları
+                group_memory.add_group_message(chat_id, user_id, username, user_message, "user")
                 logger.info(f"Group message saved from {username} ({user_id}) in chat {chat_id}: {user_message[:50]}...")
+            else:
+                # Özel mesajlar
+                group_memory.add_private_message(user_id, username, user_message, "user")
+                logger.info(f"Private message saved from {username} ({user_id}): {user_message[:50]}...")
 
             # Kullanıcı tercihi algılama (bot'a yönelik mesajlarda)
             if update.message.chat.type in ['group', 'supergroup']:
@@ -472,8 +611,7 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
 
             # Bot'a yönelik mesajlar için işlem yap
             if bot_should_respond:
-                # Kullanıcı mesajını hafızaya ekle
-                memory.add_message(user_id, chat_id, "user", user_message)
+                # Kullanıcı mesajını zaten kaydettik, şimdi bot yanıtını kaydedeceğiz
 
                 # Özetleme isteği kontrolü
                 if ("özet" in user_message.lower() or "özetle" in user_message.lower()) and update.message.chat.type in ['group', 'supergroup']:
@@ -491,8 +629,11 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
                 ai_response = await self.get_ai_response(user_message, user_id, chat_id)
 
                 if ai_response:
-                    # Bot yanıtını hafızaya ekle
-                    memory.add_message(user_id, chat_id, "assistant", ai_response)
+                    # Bot yanıtını kaydet (grup veya özel mesaj)
+                    if update.message.chat.type in ['group', 'supergroup']:
+                        group_memory.add_bot_response(chat_id, ai_response, user_id, username)
+                    else:
+                        group_memory.add_private_bot_response(user_id, ai_response)
 
                     # Mesajı gönder
                     await update.message.reply_text(ai_response)
@@ -513,8 +654,11 @@ Bot konuşma geçmişinizi hatırlar ve daha iyi yanıtlar verir.
             # Gemini modelini oluştur
             model = genai.GenerativeModel('models/gemini-2.0-flash')
 
-            # Konuşma geçmişini al
-            conversation_history = memory.get_conversation_history(user_id, chat_id)
+            # Konuşma geçmişini al (grup veya özel mesaj)
+            if chat_id < 0:  # Grup mesajı
+                conversation_history = group_memory.get_conversation_history(chat_id, user_id)
+            else:  # Özel mesaj
+                conversation_history = group_memory.get_private_conversation_history(user_id)
             
             # Grup üyelerinin son mesajlarını al (eğer grup ise)
             group_users_context = ""
@@ -595,6 +739,20 @@ Grup üyeleri hakkında:
 - Kullanıcıların kişisel tercihlerini hatırlar ve buna göre davranır
 - Her kullanıcının nasıl muhatap olunmasını istediğini bilir ve uygular
 
+ÖNEMLİ GİZLİLİK VE GÜVENLİK KURALLARI:
+- Kullanıcıların tercihlerini kaydetmek için açık onayları gerekiyor
+- Sadece onay veren kullanıcıların tercihlerini hatırlayabilirsin
+- Kullanıcılar istediği zaman tercihlerini silebilir veya değiştirebilir
+- Hiçbir kullanıcının tercihini zorla kaydetme
+- Her kullanıcının kimlik ve tercih haklarına saygı göster
+
+KRİTİK GÜVENLİK PRENSİPLERİ:
+- BAŞKASININ ADINA KARAR VERME! Herkes sadece kendi tercihlerini belirleyebilir
+- Kullanıcı A'nın adına Kullanıcı B tercih kaydedemez
+- Sadece tercih sahibi kendi tercihlerini değiştirebilir
+- Kimlik doğrulama: Her işlem sadece tercih sahibi tarafından yapılabilir
+- Proxy/vekâlet sistemi YOK: Herkes kendi adına konuşur
+
 Reddetme örnekleri:
 - "Hayır efendimiz, bunu yapmam"
 - "Bu konuda yardım edemem"
@@ -607,7 +765,7 @@ Ama çoğunlukla yardımcı ve hizmetkar ol."""
             if conversation_history:
                 # Konuşma geçmişi varsa, son birkaç mesajı dahil et
                 recent_history = conversation_history[-6:]  # Son 6 mesaj (3 çift)
-                context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_history])
+                context = "\n".join([f"{'Bot' if msg['message_type'] == 'bot' else msg['username']}: {msg['message']}" for msg in recent_history])
                 prompt = f"{system_prompt}{group_users_context}{user_preferences_text}\n\nKonuşma geçmişi:\n{context}\n\nKullanıcı: {message}"
             else:
                 prompt = f"{system_prompt}{group_users_context}{user_preferences_text}\n\nKullanıcı sorusu: {message}"

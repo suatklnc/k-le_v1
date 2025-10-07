@@ -1,0 +1,36 @@
+{
+    "970116865": [
+        {
+            "user_id": 970116865,
+            "username": "suatklnc",
+            "message": "nasılsın",
+            "message_type": "user",
+            "timestamp": 1759875023.2643046,
+            "datetime": "2025-10-08T01:10:23.264306"
+        },
+        {
+            "user_id": 970116865,
+            "username": "Bot",
+            "message": "\"Bana sorarsan eğer, iyilik sağlık... Lâkin senin keyfin nasıl efendimiz?\"",
+            "message_type": "bot",
+            "timestamp": 1759875024.2865534,
+            "datetime": "2025-10-08T01:10:24.286555"
+        },
+        {
+            "user_id": 970116865,
+            "username": "suatklnc",
+            "message": "nerde duracağımızı merhaba",
+            "message_type": "user",
+            "timestamp": 1759875119.418134,
+            "datetime": "2025-10-08T01:11:59.418135"
+        },
+        {
+            "user_id": 970116865,
+            "username": "Bot",
+            "message": "\"Dur yolcu! Bilmeden gelip bastığın bu toprak, bir devrin battığı yerdir.\" - Necmettin Halil Onan. Nerede duracağınızı siz belirleyin efendimiz, ben sadece yolunuzu aydınlatırım.",
+            "message_type": "bot",
+            "timestamp": 1759875120.4704223,
+            "datetime": "2025-10-08T01:12:00.470424"
+        }
+    ]
+}

@@ -31,8 +31,12 @@ class UserPreferences:
         """Chat ve user ID'sine göre benzersiz anahtar oluşturur."""
         return f"{chat_id}_{user_id}"
 
-    def add_preference(self, chat_id: int, user_id: int, username: str, preference_type: str, preference_value: str):
+    def add_preference(self, chat_id: int, user_id: int, username: str, preference_type: str, preference_value: str, require_consent: bool = True, requesting_user_id: int = None):
         """Kullanıcının tercihini kaydeder."""
+        # Güvenlik kontrolü: Sadece kendi tercihlerini kaydedebilir
+        if requesting_user_id is not None and requesting_user_id != user_id:
+            return False, "❌ Başkasının adına tercih kaydedemezsiniz! Herkes sadece kendi tercihlerini belirleyebilir."
+        
         key = self._get_key(chat_id, user_id)
         if key not in self.user_preferences:
             self.user_preferences[key] = {
@@ -40,15 +44,28 @@ class UserPreferences:
                 "user_id": user_id,
                 "username": username,
                 "preferences": {},
-                "last_updated": time.time()
+                "consent_given": False,
+                "last_updated": time.time(),
+                "created_by": user_id  # Kim oluşturdu
             }
 
         user_data = self.user_preferences[key]
+        
+        # Güvenlik kontrolü: Sadece tercih sahibi değiştirebilir
+        if "created_by" in user_data and user_data["created_by"] != user_id:
+            return False, "❌ Bu kullanıcının tercihlerini değiştirme yetkiniz yok!"
+        
         user_data["username"] = username  # Kullanıcı adı güncellenebilir
+        
+        # Eğer onay gerekiyorsa ve henüz verilmemişse, tercihi kaydetme
+        if require_consent and not user_data.get("consent_given", False):
+            return False, "Bu tercihi kaydetmek için önce onay vermeniz gerekiyor. 'tercih onayla' komutunu kullanın."
+        
         user_data["preferences"][preference_type] = preference_value
         user_data["last_updated"] = time.time()
 
         self._save_preferences()
+        return True, "Tercih başarıyla kaydedildi."
 
     def get_user_preferences(self, chat_id: int, user_id: int) -> Dict[str, Any]:
         """Belirli bir kullanıcının tercihlerini döndürür."""
@@ -94,14 +111,94 @@ class UserPreferences:
             del self.user_preferences[key]
         self._save_preferences()
 
+    def give_consent(self, chat_id: int, user_id: int, username: str, requesting_user_id: int = None):
+        """Kullanıcının tercih kaydetme onayını verir."""
+        # Güvenlik kontrolü: Sadece kendi onayını verebilir
+        if requesting_user_id is not None and requesting_user_id != user_id:
+            return False, "❌ Başkasının adına onay veremezsiniz! Herkes sadece kendi onayını verebilir."
+        
+        key = self._get_key(chat_id, user_id)
+        if key not in self.user_preferences:
+            self.user_preferences[key] = {
+                "chat_id": chat_id,
+                "user_id": user_id,
+                "username": username,
+                "preferences": {},
+                "consent_given": True,
+                "last_updated": time.time(),
+                "created_by": user_id
+            }
+        else:
+            # Güvenlik kontrolü: Sadece tercih sahibi onay verebilir
+            if "created_by" in self.user_preferences[key] and self.user_preferences[key]["created_by"] != user_id:
+                return False, "❌ Bu kullanıcının adına onay verme yetkiniz yok!"
+            
+            self.user_preferences[key]["consent_given"] = True
+            self.user_preferences[key]["username"] = username
+            self.user_preferences[key]["last_updated"] = time.time()
+        
+        self._save_preferences()
+        return True, "Onay başarıyla verildi."
+
+    def revoke_consent(self, chat_id: int, user_id: int, requesting_user_id: int = None):
+        """Kullanıcının tercih kaydetme onayını geri alır ve tüm tercihlerini siler."""
+        # Güvenlik kontrolü: Sadece kendi onayını geri alabilir
+        if requesting_user_id is not None and requesting_user_id != user_id:
+            return False, "❌ Başkasının adına onay geri alamazsınız! Herkes sadece kendi onayını geri alabilir."
+        
+        key = self._get_key(chat_id, user_id)
+        if key in self.user_preferences:
+            # Güvenlik kontrolü: Sadece tercih sahibi onay geri alabilir
+            if "created_by" in self.user_preferences[key] and self.user_preferences[key]["created_by"] != user_id:
+                return False, "❌ Bu kullanıcının adına onay geri alma yetkiniz yok!"
+            
+            self.user_preferences[key]["consent_given"] = False
+            self.user_preferences[key]["preferences"] = {}
+            self.user_preferences[key]["last_updated"] = time.time()
+            self._save_preferences()
+        return True, "Onay başarıyla geri alındı."
+
+    def has_consent(self, chat_id: int, user_id: int) -> bool:
+        """Kullanıcının tercih kaydetme onayı olup olmadığını kontrol eder."""
+        key = self._get_key(chat_id, user_id)
+        if key in self.user_preferences:
+            return self.user_preferences[key].get("consent_given", False)
+        return False
+
+    def validate_preference(self, preference_type: str, preference_value: str) -> tuple[bool, str]:
+        """Tercih değerinin geçerli olup olmadığını kontrol eder."""
+        # Güvenli tercih türleri
+        safe_types = ["hitap", "dil", "ton", "kişilik", "ilgi", "şair"]
+        
+        if preference_type not in safe_types:
+            return False, f"'{preference_type}' güvenli bir tercih türü değil."
+        
+        # Güvenli değerler
+        safe_values = {
+            "hitap": ["sen", "siz", "efendim", "kanka", "dost"],
+            "dil": ["eski türkçe", "modern türkçe", "arapça", "farsça"],
+            "ton": ["şakacı", "ciddi", "romantik", "nazik"],
+            "kişilik": ["gururlu", "itaatkar", "şakacı", "saygılı"],
+            "ilgi": ["şiir", "müzik", "kitap", "sanat", "edebiyat"],
+            "şair": ["nazım hikmet", "yahya kemal", "orhan veli", "cemal süreya", "attila ilhan"]
+        }
+        
+        if preference_type in safe_values:
+            if preference_value.lower() not in safe_values[preference_type]:
+                return False, f"'{preference_value}' geçerli bir {preference_type} değeri değil."
+        
+        return True, "Geçerli tercih değeri."
+
     def get_preferences_stats(self) -> Dict[str, Any]:
         """Tercih istatistiklerini döndürür."""
         total_users = len(self.user_preferences)
         total_preferences = sum(len(user_data["preferences"]) for user_data in self.user_preferences.values())
+        users_with_consent = sum(1 for user_data in self.user_preferences.values() if user_data.get("consent_given", False))
         
         return {
             "total_users": total_users,
             "total_preferences": total_preferences,
+            "users_with_consent": users_with_consent,
             "users": list(self.user_preferences.keys())
         }
 
